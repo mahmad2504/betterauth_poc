@@ -4,10 +4,18 @@ import { join } from "node:path";
 import express from "express";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth, authBaseUrl, dbPool, isGoogleSignInEnabled } from "./auth.js";
-import { provisionPendingUser, sendSetupEmailForUser } from "./provision-user.js";
+import { provisionPendingUser, sendSetupEmailForUser, createPendingUserByAdmin, ProvisionError } from "./provision-user.js";
 
 const app = express();
 const port = Number(process.env.AUTH_PORT ?? 3000);
+
+function userHasAdminRole(user: { role?: string | null } | undefined) {
+  if (!user?.role) return false;
+  return user.role
+    .split(",")
+    .map((part) => part.trim())
+    .includes("admin");
+}
 
 function sendAuthPage(res: express.Response, filename: string) {
   const html = readFileSync(join("public", filename), "utf8").replace(
@@ -31,6 +39,10 @@ app.get("/", (_req, res) => {
           <span class="eyebrow">PORT ${port}</span>
           <h1>Central identity provider</h1>
           <p>This Better Auth server owns the account and shared SSO session.</p>
+          <div class="actions">
+            <a class="button" href="/sign-in">Sign in</a>
+            <a class="button secondary" href="/admin">Admin panel</a>
+          </div>
         </main>
       </body>
     </html>`);
@@ -46,6 +58,10 @@ app.get("/sign-up", (_req, res) => {
 
 app.get("/set-password", (_req, res) => {
   sendAuthPage(res, "set-password.html");
+});
+
+app.get("/admin", (_req, res) => {
+  res.sendFile(join(process.cwd(), "public", "admin.html"));
 });
 
 app.post("/api/auth/sign-up/pending", express.json(), async (req, res) => {
@@ -71,7 +87,7 @@ app.post("/api/admin/send-setup-email", express.json(), async (req, res) => {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
-  if (!session?.user || session.user.role !== "admin") {
+  if (!session?.user || !userHasAdminRole(session.user)) {
     res.status(403).json({ message: "Admin access required." });
     return;
   }
@@ -87,6 +103,41 @@ app.post("/api/admin/send-setup-email", express.json(), async (req, res) => {
     message:
       "If this email exists in our system, check your inbox for a password setup link.",
   });
+});
+
+app.post("/api/admin/create-user", express.json(), async (req, res) => {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (!session?.user || !userHasAdminRole(session.user)) {
+    res.status(403).json({ message: "Admin access required." });
+    return;
+  }
+
+  const name = String(req.body?.name ?? "").trim();
+  const email = String(req.body?.email ?? "").trim();
+  if (!name || !email) {
+    res.status(400).json({ message: "Name and email are required." });
+    return;
+  }
+
+  try {
+    const result = await createPendingUserByAdmin({ name, email });
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof ProvisionError) {
+      const status =
+        error.code === "USER_EXISTS"
+          ? 409
+          : error.code === "EMAIL_FAILED"
+            ? 502
+            : 500;
+      res.status(status).json({ message: error.message, code: error.code });
+      return;
+    }
+    console.error("Admin create-user failed:", error);
+    res.status(500).json({ message: "Could not create user." });
+  }
 });
 
 app.get("/consent", (_req, res) => {

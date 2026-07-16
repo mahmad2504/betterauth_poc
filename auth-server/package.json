@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:ui": "esbuild src/public/auth-ui.ts --bundle --format=iife --platform=browser --outfile=public/auth-ui.js",
+    "build:ui": "esbuild src/public/auth-ui.ts src/public/admin-ui.ts --bundle --format=iife --platform=browser --outdir=public",
     "db:migrate": "auth migrate --config src/auth.ts --yes",
-    "bootstrap": "tsx src/bootstrap.ts",
+    "bootstrap": "node --use-system-ca ./node_modules/tsx/dist/cli.mjs src/bootstrap.ts",
     "setup": "npm run build:ui && npm run db:migrate && npm run bootstrap",
-    "dev": "npm run build:ui && tsx watch src/server.ts",
-    "start": "npm run build:ui && tsx src/server.ts",
+    "dev": "npm run build:ui && node --use-system-ca ./node_modules/tsx/dist/cli.mjs watch src/server.ts",
+    "start": "npm run build:ui && node --use-system-ca ./node_modules/tsx/dist/cli.mjs src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

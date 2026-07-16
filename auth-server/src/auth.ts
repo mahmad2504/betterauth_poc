@@ -52,9 +52,10 @@ export const auth = betterAuth({
       });
     },
     async onPasswordReset({ user }) {
+      // Password setup link was emailed to this address, so treat it as verified.
       await dbPool.execute(
-        "UPDATE user SET accountStatus = ? WHERE id = ?",
-        ["active", user.id],
+        "UPDATE user SET accountStatus = ?, emailVerified = ? WHERE id = ?",
+        ["active", true, user.id],
       );
     },
   },

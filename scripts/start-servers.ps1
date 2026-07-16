@@ -19,7 +19,8 @@ foreach ($app in $Apps) {
       "-NoProfile",
       "-ExecutionPolicy", "Bypass",
       "-Command",
-      "Set-Location -LiteralPath '$dir'; Write-Host '[$app] npm run dev'; npm run dev"
+      # --use-system-ca helps behind corporate SSL inspection (Google OAuth / HTTPS).
+      "`$env:NODE_OPTIONS = if (`$env:NODE_OPTIONS) { (`$env:NODE_OPTIONS + ' --use-system-ca').Trim() } else { '--use-system-ca' }; Set-Location -LiteralPath '$dir'; Write-Host '[$app] npm run dev'; npm run dev"
     ) `
     -WorkingDirectory $dir `
     -WindowStyle Minimized `

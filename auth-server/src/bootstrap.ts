@@ -53,6 +53,12 @@ async function getBootstrapHeaders() {
     });
   }
 
+  // Ensure role survives older bootstraps (user may exist with role=null).
+  await dbPool.execute(
+    "UPDATE user SET role = ?, emailVerified = ? WHERE email = ?",
+    ["admin", true, credentials.email],
+  );
+
   const cookie = response.headers
     .getSetCookie()
     .map((value) => value.split(";", 1)[0])

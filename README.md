@@ -86,24 +86,36 @@ Signup is invite-style:
 2. A dormant account is created.
 3. A password setup link is emailed to the user.
 4. User opens `/set-password?token=...` and sets a password.
-5. Account is activated and can sign in / use SSO.
+5. Account is activated (`accountStatus=active`, `emailVerified=true`) and can sign in / use SSO.
 
 If a dormant user tries to authenticate before setting a password, the auth server blocks session creation.
 
 ### Admin/API provisioning
 
-After `npm run setup`, the bootstrap user is seeded with role `admin`.
+After `npm run setup`, the bootstrap user is seeded with role `admin`:
 
-Create a user without password:
+- Email: `oauth-bootstrap@local.test`
+- Password: `local-bootstrap-password`
+
+Open the admin panel at [http://localhost:3000/admin](http://localhost:3000/admin), sign in with that account, then create users with **name + email only**. Existing emails return an error; new accounts get a password setup email (same flow as public signup).
+
+REST equivalent (admin session cookie required):
 
 ```http
-POST /api/auth/admin/create-user
+POST /api/admin/create-user
 Content-Type: application/json
+Cookie: <admin-session-cookie>
 
-{ "name": "Alice", "email": "alice@example.com", "role": "user" }
+{ "name": "Alice", "email": "alice@example.com" }
 ```
 
-Then trigger setup email:
+Responses:
+
+- `201` — account created, setup email sent
+- `409` — email already exists
+- `403` — not an admin session
+
+Resend a setup email for an existing pending user:
 
 ```http
 POST /api/admin/send-setup-email
@@ -113,6 +125,16 @@ Cookie: <admin-session-cookie>
 { "email": "alice@example.com" }
 ```
 
+You can also use Better Auth’s built-in admin create-user (password optional depending on config):
+
+```http
+POST /api/auth/admin/create-user
+Content-Type: application/json
+
+{ "name": "Alice", "email": "alice@example.com", "role": "user" }
+```
+
+Then trigger setup email via `/api/admin/send-setup-email` as above.
 ## Google sign-in
 
 The IdP also supports Google as a social provider. App-one and app-two still use OIDC against Better Auth; only the central `/sign-in` / `/sign-up` pages offer **Continue with Google**.
@@ -133,6 +155,8 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 Google is optional: the provider and its UI are enabled only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are non-empty.
 
 Google is **sign-in only** for existing accounts (`disableSignUp: true`). New users must sign up with email and complete password setup first. An unknown Google email is refused (`signup_disabled`) and redirected back to `/sign-in` with an error message. If Google uses the same email as an existing email/password account, Better Auth links them automatically. This demo trusts Google for that (`account.accountLinking` in `auth-server/src/auth.ts`) because local email verification is not enabled. Without that config you may see `account_not_linked`.
+
+If Google fails with `invalid_code`, the auth-server could not call Google’s token endpoint. On networks that intercept TLS (corporate proxies), auth-server scripts run Node with `--use-system-ca` so the Windows trust store is used. Restart with `npm run restart` after pulling that change. Also confirm the OAuth client redirect URI is exactly `http://localhost:3000/api/auth/callback/google`.
 
 ## JWT trust model
 

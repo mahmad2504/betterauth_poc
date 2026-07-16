@@ -38,7 +38,12 @@ function showMessage(text: string, isError = true) {
 }
 
 function currentCallbackURL() {
-  return `${window.location.pathname}${window.location.search}` || "/";
+  const url = new URL(window.location.href);
+  // Don't carry OAuth error query params into the post-login return URL.
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_description");
+  const pathAndQuery = `${url.pathname}${url.search}`;
+  return pathAndQuery === "/" ? "/" : pathAndQuery || "/";
 }
 
 function getMessage(error: unknown, fallback: string) {
@@ -54,6 +59,10 @@ const oauthErrorMessages: Record<string, string> = {
     "This Google account is not linked to an existing user. Sign up with email first.",
   access_denied: "Google sign-in was cancelled.",
   oauth_provider_not_found: "Google sign-in is not configured.",
+  invalid_code:
+    "Google sign-in failed while exchanging the auth code. Restart auth-server (it uses Node --use-system-ca) and confirm the Google redirect URI is http://localhost:3000/api/auth/callback/google.",
+  dormant_account:
+    "Complete password setup from your email before signing in with Google.",
 };
 
 const oauthError = new URLSearchParams(window.location.search).get("error");
@@ -130,18 +139,24 @@ form?.addEventListener("submit", async (event) => {
       return;
     }
 
+    const callbackURL =
+      new URLSearchParams(window.location.search).get("callbackURL") ||
+      undefined;
+
     const result = await authClient.signIn.email({
       email: String(data.get("email") ?? ""),
       password: String(data.get("password") ?? ""),
+      ...(callbackURL ? { callbackURL } : {}),
     });
     if (result.error) {
       showMessage(result.error.message ?? "Authentication failed.");
       return;
     }
     const destination =
-      result.data && "url" in result.data
+      callbackURL ||
+      (result.data && "url" in result.data
         ? String(result.data.url)
-        : window.location.origin;
+        : window.location.origin);
     window.location.assign(destination);
   } catch (error) {
     showMessage(getMessage(error, "Authentication failed."));
