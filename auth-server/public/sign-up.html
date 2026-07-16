@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Create account · Better Auth</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="card">
+      <span class="eyebrow">BETTER AUTH · PORT 3000</span>
+      <h1>Create your central account</h1>
+      <p>This account belongs to the identity provider, not either demo app.</p>
+      <form data-auth-form="signup">
+        <label>Name<input name="name" autocomplete="name" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <p data-message class="message" hidden></p>
+        <button type="submit">Create account and continue</button>
+      </form>
+      <p class="switch">Already registered? <a data-preserve-query href="/sign-in">Sign in</a></p>
+    </main>
+    <script src="/auth-ui.js"></script>
+  </body>
+</html>

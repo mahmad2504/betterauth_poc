@@ -1,0 +1,6 @@
+**/node_modules/
+**/.env
+auth-server/data/
+auth-server/public/auth-ui.js
+**/coverage/
+*.log

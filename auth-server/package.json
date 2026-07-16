@@ -1,0 +1,33 @@
+{
+  "name": "better-auth-sso-provider",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:ui": "esbuild src/public/auth-ui.ts --bundle --format=iife --platform=browser --outfile=public/auth-ui.js",
+    "db:migrate": "auth migrate --config src/auth.ts --yes",
+    "bootstrap": "tsx src/bootstrap.ts",
+    "setup": "npm run build:ui && npm run db:migrate && npm run bootstrap",
+    "dev": "npm run build:ui && tsx watch src/server.ts",
+    "start": "npm run build:ui && tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@better-auth/oauth-provider": "latest",
+    "better-auth": "latest",
+    "better-sqlite3": "latest",
+    "dotenv": "latest",
+    "express": "latest"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "auth": "latest",
+    "esbuild": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
