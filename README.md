@@ -62,6 +62,25 @@ If MySQL is emptied or recreated (new Docker volume, `docker compose down -v`, n
 
 Clear those four values in `auth-server/.env` (and the matching vars in `app-one/.env` / `app-two/.env` if present), then run `npm run setup` again so new clients are created and exported.
 
+## Google sign-in
+
+The IdP also supports Google as a social provider. App-one and app-two still use OIDC against Better Auth; only the central `/sign-in` / `/sign-up` pages offer **Continue with Google**.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**.
+2. Add this authorized redirect URI:
+
+   `http://localhost:3000/api/auth/callback/google`
+3. Put the Client ID and Client Secret in `auth-server/.env`:
+
+```
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+```
+
+4. Restart the auth-server. On `/sign-in` (including when arriving from App One or App Two), choose **Continue with Google**.
+
+If Google uses the same email as an existing email/password account, Better Auth links them automatically. This demo trusts Google for that (`account.accountLinking` in `auth-server/src/auth.ts`) because local email verification is not enabled. Without that config you may see `account_not_linked`.
+
 ## JWT trust model
 
 Better Auth keeps its private signing key in MySQL and publishes only the public keys through the OIDC `jwks_uri`. After exchanging an authorization code, each app:
@@ -75,7 +94,22 @@ The ID token and access token remain server-side and are never sent to applicati
 
 ## Start
 
-Open three terminals:
+From the repo root, start all three servers at once (minimized PowerShell windows):
+
+```powershell
+npm run start:all
+```
+
+Stop or restart them the same way:
+
+```powershell
+npm run stop
+npm run restart
+```
+
+These map to `scripts/stop-servers.ps1`, `scripts/start-servers.ps1`, and `scripts/restart-servers.ps1`.
+
+Or open three terminals manually:
 
 ```powershell
 cd auth-server

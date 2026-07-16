@@ -71,3 +71,32 @@ button:disabled { opacity: .6; cursor: wait; }
 .message.error { color: #b91c1c; }
 .switch { margin: 20px 0 0; text-align: center; }
 a { color: #4338ca; }
+
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: #94a3b8;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: #e2e8f0;
+}
+
+button.social {
+  width: 100%;
+  background: #fff;
+  color: #14213d;
+  border: 1px solid #cbd5e1;
+}
+
+button.social:hover {
+  background: #f8fafc;
+}

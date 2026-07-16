@@ -1,9 +1,12 @@
-{
+﻿{
   "name": "betterauth",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/stop-servers.ps1",
+    "start:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-servers.ps1",
+    "restart": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/restart-servers.ps1",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

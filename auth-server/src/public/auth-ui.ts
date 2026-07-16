@@ -23,6 +23,10 @@ function showMessage(text: string, isError = true) {
   message.hidden = false;
 }
 
+function currentCallbackURL() {
+  return `${window.location.pathname}${window.location.search}` || "/";
+}
+
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!submit) return;
@@ -61,3 +65,32 @@ form?.addEventListener("submit", async (event) => {
     submit.disabled = false;
   }
 });
+
+for (const button of document.querySelectorAll<HTMLButtonElement>(
+  "[data-social]",
+)) {
+  button.addEventListener("click", async () => {
+    const provider = button.dataset.social;
+    if (!provider) return;
+
+    button.disabled = true;
+    showMessage("Redirecting to Google…", false);
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: provider as "google",
+        callbackURL: currentCallbackURL(),
+      });
+
+      if (result.error) {
+        showMessage(result.error.message ?? "Social sign-in failed.");
+        button.disabled = false;
+      }
+    } catch (error) {
+      showMessage(
+        error instanceof Error ? error.message : "Social sign-in failed.",
+      );
+      button.disabled = false;
+    }
+  });
+}

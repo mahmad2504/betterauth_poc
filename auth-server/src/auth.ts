@@ -32,6 +32,22 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  account: {
+    accountLinking: {
+      enabled: true,
+      // Demo uses email/password without verification, so local emails are often
+      // unverified. Trust Google so same-email social sign-in can link.
+      trustedProviders: ["google"],
+      requireLocalEmailVerified: false,
+    },
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      prompt: "select_account",
+    },
+  },
   disabledPaths: ["/token"],
   plugins: [
     jwt(),
