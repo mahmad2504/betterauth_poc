@@ -2,7 +2,7 @@ import "dotenv/config";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { auth } from "./auth.js";
+import { auth, dbPool } from "./auth.js";
 
 type CreatedClient = {
   client_id: string;
@@ -168,3 +168,6 @@ for (const app of apps) {
     `${app.name}: ${rotateSecrets && clientId ? "rotated and exported" : "exported"} OAuth credentials to ${distributionEnvPath}`,
   );
 }
+
+await dbPool.end();
+

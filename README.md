@@ -6,12 +6,13 @@ Three independent Node/Express projects demonstrate central single sign-on:
 - `app-one` — Express relying party on `http://localhost:3001`
 - `app-two` — Express relying party on `http://localhost:3002`
 
-Each directory has its own `package.json` and `node_modules`. The two applications use `openid-client` with Authorization Code flow, S256 PKCE, and state validation. Passwords and accounts exist only in the Better Auth server.
+Each directory has its own `package.json` and `node_modules`. The two applications use `openid-client` with Authorization Code flow, S256 PKCE, and state validation. Passwords and accounts exist only in the Better Auth server. Auth data is stored in MySQL.
 
 ## Prerequisites
 
 - Node.js 22 or newer
 - npm
+- Docker (for the MySQL service)
 
 ## Install
 
@@ -26,22 +27,44 @@ cd ..\app-two
 npm install
 ```
 
+## MySQL
+
+From the repo root, start MySQL with a persistent named volume:
+
+```powershell
+docker compose up -d
+```
+
+Wait until the container is healthy (`docker compose ps`). Compose creates the `better_auth` database on first start. Data survives `docker compose down` / `up`; use `docker compose down -v` only if you want to wipe the volume.
+
+Default credentials match `auth-server/.env.example`: root / root on `localhost:3306`.
+
 ## One-time setup
 
-Optionally copy `auth-server/.env.example` to `auth-server/.env` and replace `BETTER_AUTH_SECRET`. The included fallback is suitable only for this local demo.
+Optionally copy `auth-server/.env.example` to `auth-server/.env` and replace `BETTER_AUTH_SECRET`. The included fallback is suitable only for this local demo. `MYSQL_*` values already match the Compose service.
 
-Run migrations and register both trusted OAuth clients:
+With MySQL running, run migrations and register both trusted OAuth clients:
 
 ```powershell
 cd auth-server
 npm run setup
 ```
 
-This creates `auth-server/data/auth.sqlite` and writes generated client credentials to `app-one/.env` and `app-two/.env`. These files are intentionally ignored by Git. Re-running setup keeps existing generated credentials.
+This migrates Better Auth tables in MySQL and writes generated client credentials to `app-one/.env` and `app-two/.env`. These files are intentionally ignored by Git. Re-running setup keeps existing generated credentials.
+
+### Re-bootstrap after a fresh database
+
+If MySQL is emptied or recreated (new Docker volume, `docker compose down -v`, new database name), old `APP_*_OIDC_CLIENT_ID` / `APP_*_OIDC_CLIENT_SECRET` values in `auth-server/.env` still point at clients that no longer exist. Bootstrap then fails with:
+
+```text
+[APIError] { status: 'NOT_FOUND', body: { error: 'not_found', error_description: 'client not found' } }
+```
+
+Clear those four values in `auth-server/.env` (and the matching vars in `app-one/.env` / `app-two/.env` if present), then run `npm run setup` again so new clients are created and exported.
 
 ## JWT trust model
 
-Better Auth keeps its private signing key in `auth-server/data/auth.sqlite` and publishes only the public keys through the OIDC `jwks_uri`. After exchanging an authorization code, each app:
+Better Auth keeps its private signing key in MySQL and publishes only the public keys through the OIDC `jwks_uri`. After exchanging an authorization code, each app:
 
 1. Requires a signed OIDC ID token.
 2. Fetches and caches the provider's public JWKS.

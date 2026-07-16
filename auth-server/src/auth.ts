@@ -1,16 +1,20 @@
 import "dotenv/config";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import Database from "better-sqlite3";
+import { createPool } from "mysql2/promise";
 import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
 
-const databasePath = resolve(process.env.DATABASE_PATH ?? "./data/auth.sqlite");
-mkdirSync(dirname(databasePath), { recursive: true });
-
 export const authBaseUrl =
   process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+
+export const dbPool = createPool({
+  host: process.env.MYSQL_HOST ?? "localhost",
+  port: Number(process.env.MYSQL_PORT ?? "3306"),
+  user: process.env.MYSQL_USER ?? "root",
+  password: process.env.MYSQL_PASSWORD ?? "root",
+  database: process.env.MYSQL_DATABASE ?? "better_auth",
+  timezone: "Z",
+});
 
 export const auth = betterAuth({
   appName: "Better Auth SSO Demo",
@@ -19,7 +23,7 @@ export const auth = betterAuth({
   secret:
     process.env.BETTER_AUTH_SECRET ??
     "local-demo-only-secret-change-before-real-deployment",
-  database: new Database(databasePath),
+  database: dbPool,
   trustedOrigins: [
     authBaseUrl,
     "http://localhost:3001",
