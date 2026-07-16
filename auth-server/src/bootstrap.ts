@@ -32,18 +32,21 @@ async function getBootstrapHeaders() {
     password: "local-bootstrap-password",
   };
 
-  let response: Response | undefined;
-  try {
-    response = await auth.api.signUpEmail({
-      body: {
-        ...credentials,
-        name: "OAuth Client Bootstrap",
-      },
-      asResponse: true,
-    });
-  } catch {}
+  let response = await auth.api.signInEmail({
+    body: credentials,
+    asResponse: true,
+  }).catch(() => undefined);
 
   if (!response?.ok) {
+    await auth.api.createUser({
+      body: {
+        email: credentials.email,
+        password: credentials.password,
+        name: "OAuth Client Bootstrap",
+        role: "admin",
+      },
+    }).catch(() => undefined);
+
     response = await auth.api.signInEmail({
       body: credentials,
       asResponse: true,

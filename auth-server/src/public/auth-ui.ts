@@ -41,6 +41,29 @@ function currentCallbackURL() {
   return `${window.location.pathname}${window.location.search}` || "/";
 }
 
+function getMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return fallback;
+}
+
+const oauthErrorMessages: Record<string, string> = {
+  signup_disabled:
+    "No account exists for this Google email. Sign up with email first, then set your password.",
+  account_not_linked:
+    "This Google account is not linked to an existing user. Sign up with email first.",
+  access_denied: "Google sign-in was cancelled.",
+  oauth_provider_not_found: "Google sign-in is not configured.",
+};
+
+const oauthError = new URLSearchParams(window.location.search).get("error");
+if (oauthError) {
+  showMessage(
+    oauthErrorMessages[oauthError] ??
+      `Sign-in failed (${oauthError.replaceAll("_", " ")}).`,
+  );
+}
+
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!submit) return;
@@ -49,32 +72,79 @@ form?.addEventListener("submit", async (event) => {
   showMessage("Working…", false);
 
   const data = new FormData(form);
-  const email = String(data.get("email") ?? "");
-  const password = String(data.get("password") ?? "");
   const mode = form.dataset.authForm;
 
   try {
-    const result =
-      mode === "signup"
-        ? await authClient.signUp.email({
-            name: String(data.get("name") ?? ""),
-            email,
-            password,
-          })
-        : await authClient.signIn.email({ email, password });
+    if (mode === "signup") {
+      const response = await fetch("/api/auth/sign-up/pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(data.get("name") ?? ""),
+          email: String(data.get("email") ?? ""),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+      if (!response.ok) {
+        showMessage(body?.message ?? "Could not create account.");
+        return;
+      }
+      showMessage(
+        body?.message ??
+          "Check your email for a password setup link before signing in.",
+        false,
+      );
+      form.reset();
+      return;
+    }
 
+    if (mode === "set-password") {
+      const password = String(data.get("password") ?? "");
+      const confirmPassword = String(data.get("confirmPassword") ?? "");
+      if (password !== confirmPassword) {
+        showMessage("Passwords do not match.");
+        return;
+      }
+
+      const token = new URLSearchParams(window.location.search).get("token");
+      if (!token) {
+        showMessage("Invalid or expired setup link.");
+        return;
+      }
+
+      const result = await authClient.resetPassword({
+        newPassword: password,
+        token,
+      });
+      if (result.error) {
+        showMessage(result.error.message ?? "Could not set password.");
+        return;
+      }
+
+      showMessage("Password saved. Redirecting to sign in…", false);
+      window.setTimeout(() => {
+        window.location.assign("/sign-in");
+      }, 800);
+      return;
+    }
+
+    const result = await authClient.signIn.email({
+      email: String(data.get("email") ?? ""),
+      password: String(data.get("password") ?? ""),
+    });
     if (result.error) {
       showMessage(result.error.message ?? "Authentication failed.");
       return;
     }
-
     const destination =
       result.data && "url" in result.data
         ? String(result.data.url)
         : window.location.origin;
     window.location.assign(destination);
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : "Authentication failed.");
+    showMessage(getMessage(error, "Authentication failed."));
   } finally {
     submit.disabled = false;
   }

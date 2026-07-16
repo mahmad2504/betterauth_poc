@@ -18,11 +18,13 @@
     "better-auth": "latest",
     "dotenv": "latest",
     "express": "latest",
-    "mysql2": "latest"
+    "mysql2": "latest",
+    "nodemailer": "^9.0.3"
   },
   "devDependencies": {
     "@types/express": "latest",
     "@types/node": "latest",
+    "@types/nodemailer": "^8.0.1",
     "auth": "latest",
     "esbuild": "latest",
     "tsx": "latest",

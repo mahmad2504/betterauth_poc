@@ -4,6 +4,7 @@ import { join } from "node:path";
 import express from "express";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth, authBaseUrl, dbPool, isGoogleSignInEnabled } from "./auth.js";
+import { provisionPendingUser, sendSetupEmailForUser } from "./provision-user.js";
 
 const app = express();
 const port = Number(process.env.AUTH_PORT ?? 3000);
@@ -41,6 +42,51 @@ app.get("/sign-in", (_req, res) => {
 
 app.get("/sign-up", (_req, res) => {
   sendAuthPage(res, "sign-up.html");
+});
+
+app.get("/set-password", (_req, res) => {
+  sendAuthPage(res, "set-password.html");
+});
+
+app.post("/api/auth/sign-up/pending", express.json(), async (req, res) => {
+  const name = String(req.body?.name ?? "").trim();
+  const email = String(req.body?.email ?? "").trim();
+  if (!name || !email) {
+    res.status(400).json({ message: "Name and email are required." });
+    return;
+  }
+  try {
+    const result = await provisionPendingUser({ name, email });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Failed to provision user or send setup email:", error);
+    res.status(500).json({
+      message:
+        "Could not send setup email. Check SMTP settings in auth-server/.env and restart the server.",
+    });
+  }
+});
+
+app.post("/api/admin/send-setup-email", express.json(), async (req, res) => {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (!session?.user || session.user.role !== "admin") {
+    res.status(403).json({ message: "Admin access required." });
+    return;
+  }
+
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  if (!email) {
+    res.status(400).json({ message: "Email is required." });
+    return;
+  }
+
+  await sendSetupEmailForUser(email);
+  res.status(200).json({
+    message:
+      "If this email exists in our system, check your inbox for a password setup link.",
+  });
 });
 
 app.get("/consent", (_req, res) => {
@@ -91,6 +137,17 @@ app.get("/health", (_req, res) => {
 
 const server = app.listen(port, () => {
   console.log(`Better Auth provider: ${authBaseUrl}`);
+  const smtpReady = Boolean(
+    process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASSWORD &&
+      process.env.SMTP_FROM,
+  );
+  if (!smtpReady) {
+    console.warn(
+      "SMTP is not configured. Password setup emails will fail until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM are set in auth-server/.env.",
+    );
+  }
 });
 
 let shuttingDown = false;

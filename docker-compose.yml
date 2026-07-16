@@ -16,5 +16,19 @@ services:
       timeout: 5s
       retries: 20
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: betterauth-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql_data:
