@@ -79,7 +79,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 
 4. Restart the auth-server. On `/sign-in` (including when arriving from App One or App Two), choose **Continue with Google**.
 
-If Google uses the same email as an existing email/password account, Better Auth links them automatically. This demo trusts Google for that (`account.accountLinking` in `auth-server/src/auth.ts`) because local email verification is not enabled. Without that config you may see `account_not_linked`.
+Google is optional: the provider and its UI are enabled only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are non-empty. If Google uses the same email as an existing email/password account, Better Auth links them automatically. This demo trusts Google for that (`account.accountLinking` in `auth-server/src/auth.ts`) because local email verification is not enabled. Without that config you may see `account_not_linked`.
 
 ## JWT trust model
 

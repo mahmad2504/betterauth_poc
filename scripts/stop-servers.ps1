@@ -1,4 +1,4 @@
-﻿# Stop auth-server, app-one, and app-two (and any leftover node watchers for this repo).
+# Stop auth-server, app-one, and app-two (and any leftover node watchers for this repo).
 $ErrorActionPreference = "SilentlyContinue"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PidFile = Join-Path $Root ".servers.pids"

@@ -1,4 +1,4 @@
-﻿# Start auth-server (3000), app-one (3001), and app-two (3002) in background windows.
+# Start auth-server (3000), app-one (3001), and app-two (3002) in background windows.
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PidFile = Join-Path $Root ".servers.pids"

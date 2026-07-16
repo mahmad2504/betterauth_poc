@@ -1,10 +1,20 @@
 import "dotenv/config";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import express from "express";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
-import { auth, authBaseUrl } from "./auth.js";
+import { auth, authBaseUrl, dbPool, isGoogleSignInEnabled } from "./auth.js";
 
 const app = express();
 const port = Number(process.env.AUTH_PORT ?? 3000);
+
+function sendAuthPage(res: express.Response, filename: string) {
+  const html = readFileSync(join("public", filename), "utf8").replace(
+    "</head>",
+    `<script>window.__GOOGLE_SIGN_IN_ENABLED__=${isGoogleSignInEnabled}</script>\n</head>`,
+  );
+  res.type("html").send(html);
+}
 
 app.get("/", (_req, res) => {
   res.type("html").send(`<!doctype html>
@@ -26,11 +36,11 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/sign-in", (_req, res) => {
-  res.sendFile("sign-in.html", { root: "public" });
+  sendAuthPage(res, "sign-in.html");
 });
 
 app.get("/sign-up", (_req, res) => {
-  res.sendFile("sign-up.html", { root: "public" });
+  sendAuthPage(res, "sign-up.html");
 });
 
 app.get("/consent", (_req, res) => {
@@ -79,6 +89,29 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, issuer: `${authBaseUrl}/api/auth` });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Better Auth provider: ${authBaseUrl}`);
+});
+
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Received ${signal}, closing MySQL pool…`);
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+  try {
+    await dbPool.end();
+  } catch (error) {
+    console.error("Failed to close MySQL pool:", error);
+  }
+  process.exit(0);
+}
+
+process.on("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+process.on("SIGTERM", () => {
+  void shutdown("SIGTERM");
 });

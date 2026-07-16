@@ -16,6 +16,14 @@ export const dbPool = createPool({
   timezone: "Z",
 });
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+
+/** Google sign-in is optional; only enable when both credentials are set. */
+export const isGoogleSignInEnabled = Boolean(
+  googleClientId && googleClientSecret,
+);
+
 export const auth = betterAuth({
   appName: "Better Auth SSO Demo",
   baseURL: authBaseUrl,
@@ -32,22 +40,26 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  account: {
-    accountLinking: {
-      enabled: true,
-      // Demo uses email/password without verification, so local emails are often
-      // unverified. Trust Google so same-email social sign-in can link.
-      trustedProviders: ["google"],
-      requireLocalEmailVerified: false,
-    },
-  },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      prompt: "select_account",
-    },
-  },
+  ...(isGoogleSignInEnabled
+    ? {
+        account: {
+          accountLinking: {
+            enabled: true,
+            // Demo uses email/password without verification, so local emails are
+            // often unverified. Trust Google so same-email social sign-in can link.
+            trustedProviders: ["google" as const],
+            requireLocalEmailVerified: false,
+          },
+        },
+        socialProviders: {
+          google: {
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+            prompt: "select_account" as const,
+          },
+        },
+      }
+    : {}),
   disabledPaths: ["/token"],
   plugins: [
     jwt(),

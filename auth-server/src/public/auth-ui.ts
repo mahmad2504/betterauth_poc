@@ -1,10 +1,24 @@
 import { createAuthClient } from "better-auth/client";
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 
+declare global {
+  interface Window {
+    __GOOGLE_SIGN_IN_ENABLED__?: boolean;
+  }
+}
+
 const authClient = createAuthClient({
   baseURL: window.location.origin,
   plugins: [oauthProviderClient()],
 });
+
+if (window.__GOOGLE_SIGN_IN_ENABLED__) {
+  for (const el of document.querySelectorAll<HTMLElement>(
+    "[data-google-sign-in]",
+  )) {
+    el.hidden = false;
+  }
+}
 
 const form = document.querySelector<HTMLFormElement>("[data-auth-form]");
 const message = document.querySelector<HTMLElement>("[data-message]");
@@ -85,7 +99,20 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
       if (result.error) {
         showMessage(result.error.message ?? "Social sign-in failed.");
         button.disabled = false;
+        return;
       }
+
+      const destination =
+        result.data && "url" in result.data && result.data.url
+          ? String(result.data.url)
+          : null;
+      if (destination) {
+        window.location.assign(destination);
+        return;
+      }
+
+      showMessage("Social sign-in failed.");
+      button.disabled = false;
     } catch (error) {
       showMessage(
         error instanceof Error ? error.message : "Social sign-in failed.",
