@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPA Application</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <main>
+      <span class="eyebrow">SPA Application</span>
+      <h1>Browser PKCE client</h1>
+      <p>
+        This vanilla web app exchanges the OAuth authorization code in the
+        browser. The ID token stays in <code>sessionStorage</code> and can be
+        sent directly to the Nest verify API.
+      </p>
+      <div class="actions">
+        <button type="button" id="login">Login with Better Auth</button>
+        <a class="secondary" href="http://localhost:3001">Open App One</a>
+      </div>
+      <p class="note" id="config-note" hidden></p>
+      <p class="error" id="error" hidden></p>
+    </main>
+    <script src="/js/config.js"></script>
+    <script type="module">
+      import {
+        beginLogin,
+        getSession,
+        reconcileLocalSessionWithAuthServer,
+      } from "/js/auth.js";
+
+      const errorEl = document.getElementById("error");
+      const noteEl = document.getElementById("config-note");
+      const loginBtn = document.getElementById("login");
+
+      async function boot() {
+        if (!window.APP_SPA_CONFIG?.clientId) {
+          noteEl.hidden = false;
+          noteEl.textContent =
+            "OAuth client_id is missing. Run npm run setup in auth-server, then reload.";
+          loginBtn.disabled = true;
+          return;
+        }
+
+        const sync = await reconcileLocalSessionWithAuthServer();
+        if (sync.matched && getSession()) {
+          location.replace("/dashboard.html");
+          return;
+        }
+        if (sync.action === "user-switched" && sync.remoteUser) {
+          noteEl.hidden = false;
+          noteEl.textContent = `Better Auth session is now ${sync.remoteUser.email}. Click Login to refresh SPA tokens.`;
+        }
+      }
+
+      void boot().catch((error) => {
+        errorEl.hidden = false;
+        errorEl.textContent =
+          error instanceof Error ? error.message : String(error);
+      });
+
+      loginBtn.addEventListener("click", async () => {
+        errorEl.hidden = true;
+        try {
+          await beginLogin();
+        } catch (error) {
+          errorEl.hidden = false;
+          errorEl.textContent =
+            error instanceof Error ? error.message : String(error);
+        }
+      });
+    </script>
+  </body>
+</html>

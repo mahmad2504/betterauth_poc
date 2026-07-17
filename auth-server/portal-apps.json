@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Application One",
+    "description": "Express relying party — reports and dashboards (SSO).",
+    "url": "http://localhost:3001/dashboard",
+    "enabled": true
+  },
+  {
+    "name": "Application Two",
+    "description": "Express relying party — operations console (SSO).",
+    "url": "http://localhost:3002/dashboard",
+    "enabled": true
+  },
+  {
+    "name": "SPA Application",
+    "description": "Browser PKCE client with Nest JWT exchange demo.",
+    "url": "http://localhost:3003/dashboard.html",
+    "enabled": true
+  },
+  {
+    "name": "API Server",
+    "description": "NestJS verify/exchange API health check (no product UI).",
+    "url": "http://localhost:3004/health",
+    "enabled": true
+  }
+]

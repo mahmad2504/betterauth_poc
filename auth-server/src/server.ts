@@ -4,10 +4,41 @@ import { join } from "node:path";
 import express from "express";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth, authBaseUrl, dbPool, isGoogleSignInEnabled } from "./auth.js";
+import { loadPortalApps } from "./portal-apps.js";
 import { provisionPendingUser, sendSetupEmailForUser, createPendingUserByAdmin, ProvisionError } from "./provision-user.js";
 
 const app = express();
 const port = Number(process.env.AUTH_PORT ?? 3000);
+
+/** Browser clients (SPA) call discovery + token endpoints cross-origin. */
+const corsAllowedOrigins = new Set([
+  authBaseUrl,
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:3003",
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && corsAllowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, Accept",
+    );
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    );
+  }
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
 
 function userHasAdminRole(user: { role?: string | null } | undefined) {
   if (!user?.role) return false;
@@ -15,6 +46,14 @@ function userHasAdminRole(user: { role?: string | null } | undefined) {
     .split(",")
     .map((part) => part.trim())
     .includes("admin");
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function sendAuthPage(res: express.Response, filename: string) {
@@ -25,27 +64,64 @@ function sendAuthPage(res: express.Response, filename: string) {
   res.type("html").send(html);
 }
 
-app.get("/", (_req, res) => {
-  res.type("html").send(`<!doctype html>
+app.get("/", async (req, res, next) => {
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+    const apps = loadPortalApps();
+    const appCards = apps.length
+      ? apps
+          .map(
+            (product) => `
+          <a class="portal-app" href="${escapeHtml(product.url)}">
+            <strong>${escapeHtml(product.name)}</strong>
+            ${
+              product.description
+                ? `<span>${escapeHtml(product.description)}</span>`
+                : ""
+            }
+          </a>`,
+          )
+          .join("")
+      : `<p class="message">No products configured. Edit <code>portal-apps.json</code> and reload.</p>`;
+
+    const sessionBlock = session?.user
+      ? `<div class="portal-session">Signed in as <strong>${escapeHtml(session.user.name || session.user.email)}</strong>
+         · <a href="/global-logout?finish=${encodeURIComponent(`${authBaseUrl}/`)}">Sign out</a></div>`
+      : `<p>Sign in once, then open any product below with SSO.</p>`;
+
+    res.type("html").send(`<!doctype html>
     <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Better Auth Identity Provider</title>
+        <title>Company Product Portal</title>
         <link rel="stylesheet" href="/styles.css">
       </head>
       <body>
-        <main class="card">
-          <span class="eyebrow">PORT ${port}</span>
-          <h1>Central identity provider</h1>
-          <p>This Better Auth server owns the account and shared SSO session.</p>
+        <main class="card card-portal">
+          <span class="eyebrow">COMPANY PORTAL</span>
+          <h1>Product portal</h1>
+          <p>Central identity for your applications. Links are loaded from a manual config file.</p>
+          ${sessionBlock}
+          <h2>Applications</h2>
+          <div class="portal-apps">${appCards}</div>
+          <p class="portal-meta">Configure apps in <code>auth-server/portal-apps.json</code></p>
           <div class="actions">
-            <a class="button" href="/sign-in">Sign in</a>
+            ${
+              session?.user
+                ? ""
+                : `<a class="button" href="/sign-in">Sign in</a>`
+            }
             <a class="button secondary" href="/admin">Admin panel</a>
           </div>
         </main>
       </body>
     </html>`);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/sign-in", (_req, res) => {
@@ -151,10 +227,18 @@ app.get("/consent", (_req, res) => {
 
 app.get("/global-logout", async (req, res, next) => {
   try {
-    const finish =
-      req.query.finish === "http://localhost:3002/"
-        ? "http://localhost:3002/"
-        : "http://localhost:3001/";
+    const allowedFinishes = new Set([
+      "http://localhost:3000/",
+      "http://localhost:3001/",
+      "http://localhost:3002/",
+      "http://localhost:3003/",
+      `${authBaseUrl}/`,
+    ]);
+    const requested = String(req.query.finish ?? `${authBaseUrl}/`);
+    const finish = allowedFinishes.has(requested)
+      ? requested
+      : `${authBaseUrl}/`;
+
     const response = await auth.api.signOut({
       headers: fromNodeHeaders(req.headers),
       asResponse: true,
@@ -162,6 +246,7 @@ app.get("/global-logout", async (req, res, next) => {
     for (const cookie of response.headers.getSetCookie()) {
       res.append("Set-Cookie", cookie);
     }
+    // Chain: App One → App Two → SPA local tokens → finish
     const firstAppLogout = new URL(
       "http://localhost:3001/auth/global-logout",
     );
@@ -170,6 +255,17 @@ app.get("/global-logout", async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+/**
+ * Clears Better Auth only, then continues the app logout chain
+ * (same as global-logout). Prefer /global-logout for "sign out everywhere".
+ */
+app.get("/spa-logout", (req, res) => {
+  const finish = String(req.query.finish ?? "http://localhost:3003/");
+  const url = new URL(`${authBaseUrl}/global-logout`);
+  url.searchParams.set("finish", finish);
+  res.redirect(303, url.href);
 });
 
 app.use(express.static("public"));

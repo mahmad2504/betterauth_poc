@@ -38,6 +38,7 @@ export const auth = betterAuth({
     authBaseUrl,
     "http://localhost:3001",
     "http://localhost:3002",
+    "http://localhost:3003",
   ],
   onAPIError: {
     errorURL: `${authBaseUrl}/sign-in`,

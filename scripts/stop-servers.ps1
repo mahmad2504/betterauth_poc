@@ -1,4 +1,5 @@
-# Stop auth-server, app-one, and app-two (and any leftover node watchers for this repo).
+# Stop auth-server, app-one, app-two, api-server, app-spa
+# (and any leftover node watchers for this repo).
 $ErrorActionPreference = "SilentlyContinue"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PidFile = Join-Path $Root ".servers.pids"
@@ -25,10 +26,10 @@ Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
   Where-Object { $_.CommandLine -and $_.CommandLine -match $RootMatch } |
   ForEach-Object { Stop-PidTree $_.ProcessId }
 
-foreach ($port in 3000, 3001, 3002) {
+foreach ($port in 3000, 3001, 3002, 3003, 3004) {
   Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty OwningProcess -Unique |
     ForEach-Object { Stop-PidTree $_ }
 }
 
-Write-Host "Stopped auth-server, app-one, and app-two."
+Write-Host "Stopped auth-server, app-one, app-two, api-server, and app-spa."

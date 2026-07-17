@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SPA dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <main>
+      <span class="eyebrow">SPA Application</span>
+      <h1>Signed in (browser session)</h1>
+      <p>
+        Better Auth ID token arrives via PKCE. Nest can exchange it for an
+        api-server JWT, then verify that Nest-issued token.
+      </p>
+
+      <h2>Verified identity</h2>
+      <dl>
+        <dt>Name</dt>
+        <dd id="name">—</dd>
+        <dt>Email</dt>
+        <dd id="email">—</dd>
+        <dt>Subject</dt>
+        <dd id="sub">—</dd>
+        <dt>Nest JWT</dt>
+        <dd id="nest-token">not issued yet</dd>
+      </dl>
+
+      <div class="actions">
+        <button type="button" id="exchange">Exchange → Nest JWT</button>
+        <button type="button" id="verify">Verify current token</button>
+        <button type="button" id="profile">Call demo profile API</button>
+        <button type="button" class="secondary" id="logout">Sign out</button>
+        <a class="secondary" href="http://localhost:3001">Open App One</a>
+      </div>
+
+      <h2>Nest API result</h2>
+      <pre id="result">Use Exchange first, then Verify to confirm source: "api-server".</pre>
+      <p class="error" id="error" hidden></p>
+    </main>
+    <script src="/js/config.js"></script>
+    <script type="module">
+      import {
+        beginLogin,
+        callNestProfile,
+        exchangeWithNest,
+        getSession,
+        reconcileLocalSessionWithAuthServer,
+        signOut,
+        verifyWithNest,
+      } from "/js/auth.js";
+
+      const nestTokenEl = document.getElementById("nest-token");
+      const resultEl = document.getElementById("result");
+      const errorEl = document.getElementById("error");
+
+      function refreshNestStatus() {
+        const session = getSession();
+        nestTokenEl.textContent = session?.nestAccessToken
+          ? "present (api-server issued)"
+          : "not issued yet";
+      }
+
+      function renderIdentity(session) {
+        document.getElementById("name").textContent = session.claims.name ?? "—";
+        document.getElementById("email").textContent =
+          session.claims.email ?? "—";
+        document.getElementById("sub").textContent = session.claims.sub ?? "—";
+        refreshNestStatus();
+      }
+
+      async function boot() {
+        const sync = await reconcileLocalSessionWithAuthServer();
+
+        if (sync.action === "signed-out") {
+          location.replace("/");
+          return;
+        }
+
+        // Portal user changed (or SPA tokens missing) while SSO cookie is active:
+        // re-run PKCE so Nest/verify use the current Better Auth user (e.g. admin).
+        if (sync.action === "user-switched" || sync.action === "needs-login") {
+          resultEl.textContent =
+            "SSO user changed — refreshing SPA tokens with Better Auth…";
+          await beginLogin();
+          return;
+        }
+
+        const session = getSession();
+        if (!session) {
+          location.replace("/");
+          return;
+        }
+        renderIdentity(session);
+      }
+
+      void boot().catch((error) => {
+        errorEl.hidden = false;
+        errorEl.textContent =
+          error instanceof Error ? error.message : String(error);
+      });
+
+      async function run(label, fn) {
+        errorEl.hidden = true;
+        resultEl.textContent = `${label}…`;
+        try {
+          const body = await fn();
+          refreshNestStatus();
+          resultEl.textContent = JSON.stringify(body, null, 2);
+        } catch (error) {
+          resultEl.textContent = "Request failed.";
+          errorEl.hidden = false;
+          errorEl.textContent =
+            error instanceof Error ? error.message : String(error);
+        }
+      }
+
+      document.getElementById("exchange").addEventListener("click", () => {
+        void run("Exchanging Better Auth token", exchangeWithNest);
+      });
+      document.getElementById("verify").addEventListener("click", () => {
+        void run("Verifying token", verifyWithNest);
+      });
+      document.getElementById("profile").addEventListener("click", () => {
+        void run("Calling demo profile", callNestProfile);
+      });
+      document.getElementById("logout").addEventListener("click", () => {
+        signOut();
+      });
+    </script>
+  </body>
+</html>

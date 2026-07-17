@@ -263,7 +263,12 @@ export function createClientApp(config: ClientAppConfig) {
   });
 
   app.get("/auth/global-logout", (req, res, next) => {
-    const allowedFinishes = [`${config.baseUrl}/`, `${config.otherAppUrl}/`];
+    const allowedFinishes = [
+      `${config.baseUrl}/`,
+      `${config.otherAppUrl}/`,
+      "http://localhost:3000/",
+      "http://localhost:3003/",
+    ];
     const finish = allowedFinishes.includes(String(req.query.finish))
       ? String(req.query.finish)
       : `${config.baseUrl}/`;

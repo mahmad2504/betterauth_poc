@@ -1,12 +1,18 @@
 # Better Auth OAuth SSO demo
 
-Three independent Node/Express projects demonstrate central single sign-on:
+Independent projects demonstrate central single sign-on and JWT verification:
 
-- `auth-server` — Better Auth OAuth 2.1/OIDC provider on `http://localhost:3000`
-- `app-one` — Express relying party on `http://localhost:3001`
-- `app-two` — Express relying party on `http://localhost:3002`
+- `auth-server` — Better Auth OAuth 2.1/OIDC provider and **company product portal** on `http://localhost:3000`
+- `app-one` — Express relying party on `http://localhost:3001` (confidential client, server-side PKCE)
+- `app-two` — Express relying party on `http://localhost:3002` (confidential client, server-side PKCE)
+- `api-server` — NestJS REST API on `http://localhost:3004` (verifies OIDC ID tokens via JWKS)
+- `app-spa` — vanilla HTML/CSS/JS SPA on `http://localhost:3003` (public client, browser PKCE)
 
-Each directory has its own `package.json` and `node_modules`. The two applications use `openid-client` with Authorization Code flow, S256 PKCE, and state validation. Passwords and accounts exist only in the Better Auth server. Auth data is stored in MySQL.
+Each directory has its own `package.json` and `node_modules`. App One/Two use `openid-client` with Authorization Code flow, S256 PKCE, and state validation on the server. The SPA exchanges the code in the browser and can call Nest directly with the ID token. Passwords and accounts exist only in the Better Auth server. Auth data is stored in MySQL.
+
+## Company product portal
+
+Open [http://localhost:3000](http://localhost:3000) for the product portal. Application links are loaded from `auth-server/portal-apps.json`. Edit that file to add, remove, rename, or disable products (`"enabled": false`), then reload the page — no code change required.
 
 ## Prerequisites
 
@@ -24,6 +30,10 @@ npm install
 cd ..\app-one
 npm install
 cd ..\app-two
+npm install
+cd ..\api-server
+npm install
+cd ..\app-spa
 npm install
 ```
 
@@ -59,14 +69,21 @@ SMTP_FROM=Auth Demo <no-reply@example.com>
 SMTP_TLS_REJECT_UNAUTHORIZED=false
 ```
 
-With MySQL running, run migrations and register both trusted OAuth clients:
+With MySQL running, run migrations and register trusted OAuth clients:
 
 ```powershell
 cd auth-server
 npm run setup
 ```
 
-This migrates Better Auth tables in MySQL and writes generated client credentials to `app-one/.env` and `app-two/.env`. These files are intentionally ignored by Git. Re-running setup keeps existing generated credentials.
+This migrates Better Auth tables in MySQL and:
+
+- writes confidential client credentials for App One/Two into `auth-server/.env`
+- registers a **public** SPA client (`token_endpoint_auth_method: none`) and writes `APP_SPA_OIDC_CLIENT_ID`
+- generates `app-spa/js/config.js` with the SPA `clientId`
+- writes audience/CORS settings into `api-server/.env`
+
+Re-running setup keeps existing generated credentials.
 
 ### Re-bootstrap after a fresh database
 
@@ -76,7 +93,7 @@ If MySQL is emptied or recreated (new Docker volume, `docker compose down -v`, n
 [APIError] { status: 'NOT_FOUND', body: { error: 'not_found', error_description: 'client not found' } }
 ```
 
-Clear those four values in `auth-server/.env` (and the matching vars in `app-one/.env` / `app-two/.env` if present), then run `npm run setup` again so new clients are created and exported.
+Clear those `APP_*_OIDC_*` values in `auth-server/.env` (and matching vars in `app-one/.env` / `app-two/.env` / `api-server/.env` if present), then run `npm run setup` again so new clients are created and exported.
 
 ## Dormant account flow
 
@@ -160,18 +177,33 @@ If Google fails with `invalid_code`, the auth-server could not call Google’s t
 
 ## JWT trust model
 
-Better Auth keeps its private signing key in MySQL and publishes only the public keys through the OIDC `jwks_uri`. After exchanging an authorization code, each app:
+Better Auth keeps its private signing key in MySQL and publishes only the public keys through the OIDC `jwks_uri`.
+
+### App One / App Two (confidential)
+
+After exchanging an authorization code server-side, each app:
 
 1. Requires a signed OIDC ID token.
 2. Fetches and caches the provider's public JWKS.
 3. Uses `jose` to verify the signature, issuer, client-specific audience, expiry, and timing claims.
 4. Creates its local Express session only from the verified JWT payload.
 
-The ID token and access token remain server-side and are never sent to application browser JavaScript.
+The ID token and access token remain server-side and are never sent to App One/Two browser JavaScript.
+
+### SPA + Nest (public client + Nest JWT exchange)
+
+1. The SPA completes PKCE in the browser and stores the Better Auth ID token in `sessionStorage`.
+2. **Exchange → Nest JWT** calls `POST /auth/exchange`:
+   - If the Bearer token is a Nest JWT (`iss=http://localhost:3004`), accept it.
+   - Otherwise verify it as a Better Auth ID token (JWKS), then **mint and return** an api-server JWT (HS256, 1h by default).
+3. **Verify current token** calls `POST /auth/verify`, which accepts **either** Nest JWT or Better Auth ID token and reports `source: "api-server" | "better-auth"`.
+4. **Call demo profile API** hits `GET /demo/profile` (same exchange-or-accept behavior).
+
+Nest signs its own tokens with `NEST_JWT_SECRET` (see `api-server/.env`).
 
 ## Start
 
-From the repo root, start all three servers at once (minimized PowerShell windows):
+From the repo root, start all servers at once (minimized PowerShell windows):
 
 ```powershell
 npm run start:all
@@ -186,7 +218,7 @@ npm run restart
 
 These map to `scripts/stop-servers.ps1`, `scripts/start-servers.ps1`, and `scripts/restart-servers.ps1`.
 
-Or open three terminals manually:
+Or open terminals manually:
 
 ```powershell
 cd auth-server
@@ -203,6 +235,16 @@ cd app-two
 npm run dev
 ```
 
+```powershell
+cd api-server
+npm run dev
+```
+
+```powershell
+cd app-spa
+npm run dev
+```
+
 ## Demonstrate SSO
 
 1. Open `http://localhost:3001` and choose **Login with Better Auth**.
@@ -211,9 +253,18 @@ npm run dev
 4. Open App Two and choose **Login with Better Auth**.
 5. The browser briefly visits port 3000 and immediately returns to App Two without asking for the password, because the central Better Auth session already exists.
 
-Each relying party still has its own local session cookie. **Log out everywhere** clears the central Better Auth session and visits both applications to clear both local cookies before returning to the app where logout started.
+Each Express relying party still has its own local session cookie. **Log out everywhere** (portal **Sign out**, SPA **Sign out**, or App One/Two **Log out everywhere**) clears the central Better Auth session, then visits App One → App Two → SPA `logout.html` to clear each local session/token store before returning to the finish URL.
 
 The dashboards also display safe application-local session data. App One assigns the `report-viewer` role with a `blue` theme, while App Two independently assigns `operations-editor` with a `violet` theme. These values are not part of the shared ID token.
+
+## Demonstrate SPA → Nest exchange / verify
+
+1. Open `http://localhost:3003` and choose **Login with Better Auth**.
+2. After callback, the SPA dashboard shows claims from the browser-held Better Auth ID token.
+3. Click **Exchange → Nest JWT** — Nest verifies the ID token and returns an api-server JWT (`exchanged: true`).
+4. Click **Verify current token** — should report `source: "api-server"`.
+5. Optionally click **Call demo profile API** for the same exchange-or-accept path on `GET /demo/profile`.
+6. **Sign out** runs global logout (Better Auth + App One + App Two + SPA tokens) via `http://localhost:3000/global-logout`, then returns to the SPA home page.
 
 ## Checks
 

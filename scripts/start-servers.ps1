@@ -1,8 +1,9 @@
-# Start auth-server (3000), app-one (3001), and app-two (3002) in background windows.
+# Start auth-server (3000), app-one (3001), app-two (3002),
+# app-spa (3003), and api-server (3004) in background windows.
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PidFile = Join-Path $Root ".servers.pids"
-$Apps = @("auth-server", "app-one", "app-two")
+$Apps = @("auth-server", "app-one", "app-two", "api-server", "app-spa")
 
 & (Join-Path $PSScriptRoot "stop-servers.ps1")
 
@@ -36,4 +37,6 @@ Write-Host "Servers starting:"
 Write-Host "  auth-server  http://localhost:3000"
 Write-Host "  app-one      http://localhost:3001"
 Write-Host "  app-two      http://localhost:3002"
+Write-Host "  app-spa      http://localhost:3003"
+Write-Host "  api-server   http://localhost:3004"
 Write-Host "PIDs saved to .servers.pids - run scripts\stop-servers.ps1 to stop."

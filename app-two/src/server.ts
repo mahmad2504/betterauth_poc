@@ -28,6 +28,7 @@ const app = createClientApp({
   sessionSecret: process.env.SESSION_SECRET!,
   sessionRole: "operations-editor",
   sessionTheme: "violet",
+  globalLogoutNext: "http://localhost:3003/logout.html",
 });
 
 app.listen(port, () => {

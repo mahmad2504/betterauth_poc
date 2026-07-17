@@ -105,6 +105,78 @@ button.social:hover {
   width: min(100%, 520px);
 }
 
+.card-portal {
+  width: min(100%, 720px);
+}
+
+.portal-apps {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.portal-app {
+  display: block;
+  padding: 16px 18px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #f8fafc;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.portal-app:hover {
+  border-color: #a5b4fc;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(79, 70, 229, .1);
+}
+
+.portal-app strong {
+  display: block;
+  color: #312e81;
+  font-size: 1.05rem;
+}
+
+.portal-app span {
+  display: block;
+  margin-top: 4px;
+  color: #526079;
+  font-size: .92rem;
+  line-height: 1.45;
+}
+
+.portal-meta {
+  margin-top: 10px;
+  font-size: .8rem;
+  color: #94a3b8;
+}
+
+.portal-session {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: .92rem;
+}
+
+.note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.note code {
+  font-size: .88rem;
+  color: #7c2d12;
+}
+
 button.linkish {
   display: inline;
   padding: 0;

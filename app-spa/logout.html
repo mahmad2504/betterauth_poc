@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signing out…</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <main>
+      <span class="eyebrow">SPA Application</span>
+      <h1>Signing out…</h1>
+      <p>Clearing browser tokens, then finishing global logout.</p>
+    </main>
+    <script type="module">
+      import { clearSession } from "/js/auth.js";
+
+      const allowedFinishes = new Set([
+        "http://localhost:3000/",
+        "http://localhost:3001/",
+        "http://localhost:3002/",
+        "http://localhost:3003/",
+      ]);
+
+      clearSession();
+
+      const requested = new URLSearchParams(location.search).get("finish");
+      const finish = allowedFinishes.has(requested ?? "")
+        ? requested
+        : "http://localhost:3000/";
+      location.replace(finish);
+    </script>
+  </body>
+</html>
